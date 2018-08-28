@@ -21,9 +21,9 @@ taskRouter.route('/')
 taskRouter.use('/:taskId', (req, res, next)=>{
 	Task.findById(req.params.taskId, (err, task)=>{
 		if(err)
-			res.status(500).send(err)
+			res.status(500).send('Status 500 - '.err)
 		else {
-			req.task =book;
+			req.task =task;
 			next()
 		}
 	})
