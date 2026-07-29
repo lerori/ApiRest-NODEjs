@@ -1,32 +1,44 @@
-var express = require("express");
-var Task = require("../models/taskModel");
+const express = require("express");
+const Task = require("../models/taskModel");
 
-var taskRouter = express.Router(); //passing the data to DB
+const taskRouter = express.Router();
+
+// Campos permitidos desde el cliente (evita mass assignment sobre _id, created_at, updated_at, etc.)
+const ALLOWED_FIELDS = ["title", "description", "due_date", "completed"];
+
+function pickAllowedFields(body) {
+  const data = {};
+  for (const field of ALLOWED_FIELDS) {
+    if (body[field] !== undefined) data[field] = body[field];
+  }
+  return data;
+}
 
 taskRouter
   .route("/")
-  //Getting tasks from database
-  .get((req, res) => {
-    Task.find({}, (err, tasks) => {
-      res.json(tasks);
-    });
+  // Obtener todas las tareas
+  .get(async (req, res) => {
+    const tasks = await Task.find({});
+    res.json(tasks);
   })
-  //Adding content to the database
-  .post((req, res) => {
-    let task = new Task(req.body);
-    task.save();
-    res.status(201).send(task);
+  // Crear una tarea
+  .post(async (req, res) => {
+    const task = new Task(pickAllowedFields(req.body));
+    await task.save();
+    res.status(201).json(task);
   });
 
-//middleware
-taskRouter.use("/:taskId", (req, res, next) => {
-  Task.findById(req.params.taskId, (err, task) => {
-    if (err) res.status(500).send("Status 500 - ".err);
-    else {
-      req.task = task;
-      next();
-    }
-  });
+// Middleware: busca la tarea por id; responde 404 si no existe.
+// Los ids con formato inválido lanzan CastError y son manejados por el
+// middleware de errores central en server.js (Express 5 reenvía automáticamente
+// los rechazos de promesas de handlers async).
+taskRouter.use("/:taskId", async (req, res, next) => {
+  const task = await Task.findById(req.params.taskId);
+  if (!task) {
+    return res.status(404).json({ error: "Tarea no encontrada" });
+  }
+  req.task = task;
+  next();
 });
 
 taskRouter
@@ -34,37 +46,22 @@ taskRouter
   .get((req, res) => {
     res.json(req.task);
   })
-  //Editing tasks in the database
-  .put((req, res) => {
-    req.task.title = req.body.title;
-    req.task.description = req.body.description;
-    req.task.due_date = req.body.due_date;
-    req.task.completed = req.body.completed;
-    //req.task.created_at = req.body.created_at
-    req.task.updated_at = req.body.updated_at;
-    req.task.save();
+  // Reemplazar la tarea
+  .put(async (req, res) => {
+    Object.assign(req.task, pickAllowedFields(req.body));
+    await req.task.save();
     res.json(req.task);
   })
-  //Editing task properties
-  .patch((req, res) => {
-    if (req.body._id) {
-      delete req.body._id;
-    }
-    for (let p in req.body) {
-      req.taskclear[p] = req.body[p];
-    }
-    req.task.save();
+  // Actualizar campos parciales de la tarea
+  .patch(async (req, res) => {
+    Object.assign(req.task, pickAllowedFields(req.body));
+    await req.task.save();
     res.json(req.task);
   })
-  //delete task
-  .delete((req, res) => {
-    req.task.remove(err => {
-      if (err) {
-        res.status(500).send(err);
-      } else {
-        res.status(204).send("removed");
-      }
-    });
+  // Eliminar la tarea
+  .delete(async (req, res) => {
+    await req.task.deleteOne();
+    res.status(204).end();
   });
 
 module.exports = taskRouter;
