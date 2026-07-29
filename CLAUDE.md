@@ -60,6 +60,16 @@ npx eslint .      # lint
 npm audit         # revisar vulnerabilidades de dependencias
 ```
 
+## Reescritura de historial de git (2026-07-29)
+
+El archivo `.env` estuvo versionado desde el primer commit del repositorio, exponiendo las credenciales de prueba de mLab en **todo** el historial de GitHub. Tras confirmarlo con el usuario se ejecutó una limpieza destructiva e irreversible:
+
+- Se usó `git filter-repo --path .env --invert-paths --force` para eliminar `.env` de los 15 commits del historial (todas las ramas).
+- Se hizo `git push origin master --force-with-lease` (todos los hashes de commit cambiaron).
+- Las 8 ramas viejas de `dependabot/npm_and_yarn/*` (que también tenían `.env` en su historial) ya habían sido eliminadas automáticamente por GitHub; se limpiaron las referencias locales.
+
+**Importante para el futuro**: como se reescribió el historial, cualquier clon/fork antiguo de este repo quedó desincronizado (hashes distintos). Si alguien más tiene una copia local, debe volver a clonar en vez de hacer `git pull`. Las credenciales de mLab ya eran inservibles (mLab cerró en 2020), pero si en algún momento se filtran credenciales *reales* en un commit, este es el procedimiento a seguir (`git filter-repo` + force-push + backup previo del repo).
+
 ## Pendiente / posibles mejoras futuras
 
 - Añadir tests automatizados (actualmente `npm test` no ejecuta nada real).
